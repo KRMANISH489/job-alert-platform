@@ -1,69 +1,167 @@
-import Image from "next/image";
+import Link from "next/link";
+import { JobRow } from "@/components/job-row";
+import { btnPrimary } from "@/components/ui";
+import { CATEGORIES } from "@/lib/constants";
+import { formatSalary } from "@/lib/format";
+import { prisma } from "@/lib/db";
+import { jobCardInclude } from "@/lib/queries";
 
-export default function Home() {
+export const metadata = {
+  title: { absolute: "JobAlert — Work worth showing up for" },
+};
+
+export default async function HomePage() {
+  const [openCount, companyCount, cityRows, featured, latest, categoryCounts] = await Promise.all([
+    prisma.job.count({ where: { status: "open" } }),
+    prisma.company.count(),
+    prisma.job.findMany({
+      where: { status: "open" },
+      select: { location: true },
+      distinct: ["location"],
+    }),
+    prisma.job.findMany({
+      where: { status: "open", featured: true },
+      include: jobCardInclude,
+      orderBy: { createdAt: "desc" },
+      take: 3,
+    }),
+    prisma.job.findMany({
+      where: { status: "open" },
+      include: jobCardInclude,
+      orderBy: { createdAt: "desc" },
+      take: 6,
+    }),
+    prisma.job.groupBy({
+      by: ["category"],
+      where: { status: "open" },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const countByCategory = new Map(categoryCounts.map((row) => [row.category, row._count._all]));
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main>
+      <section className="border-b border-line">
+        <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-14 md:grid-cols-[1.15fr_0.85fr] md:py-20">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-copper">India and remote</p>
+            <h1 className="mt-4 max-w-xl text-5xl leading-[1.05] md:text-6xl">Work worth showing up for.</h1>
+            <p className="mt-5 max-w-md text-lg text-muted">
+              Search open roles, apply with a short note, and keep an alert for the kind of work you actually want.
+            </p>
+            <form action="/jobs" className="mt-8 grid gap-2 rounded-2xl border border-line bg-cream p-2 sm:grid-cols-[1fr_1fr_auto]">
+              <div>
+                <label htmlFor="home-q" className="sr-only">
+                  Role, skill, or company
+                </label>
+                <input
+                  id="home-q"
+                  name="q"
+                  placeholder="Role, skill, or company"
+                  className="w-full rounded-xl px-3 py-3 text-sm outline-none placeholder:text-muted"
+                />
+              </div>
+              <div className="sm:border-l sm:border-line">
+                <label htmlFor="home-location" className="sr-only">
+                  City or remote
+                </label>
+                <input
+                  id="home-location"
+                  name="location"
+                  placeholder="City or Remote"
+                  className="w-full rounded-xl px-3 py-3 text-sm outline-none placeholder:text-muted"
+                />
+              </div>
+              <button type="submit" className={btnPrimary}>
+                Search roles
+              </button>
+            </form>
+            <p className="mt-4 text-sm text-muted">
+              {openCount} open roles · {companyCount} companies · {cityRows.length} locations
+            </p>
+          </div>
+          <aside className="rounded-3xl border border-line bg-cream p-5">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">Featured</p>
+            <ul className="mt-4 divide-y divide-line">
+              {featured.length === 0 ? (
+                <li className="text-sm text-muted">Featured roles will show up here.</li>
+              ) : (
+                featured.map((job) => (
+                  <li key={job.id} className="py-3 first:pt-0 last:pb-0">
+                    <Link href={`/jobs/${job.slug}`} className="block hover:text-forest">
+                      <span className="block text-xs text-muted">{job.company.name}</span>
+                      <span className="mt-0.5 block font-medium">{job.title}</span>
+                      <span className="mt-1 block text-sm text-muted">
+                        {job.location} · {formatSalary(job.salaryMin, job.salaryMax)}
+                      </span>
+                    </Link>
+                  </li>
+                ))
+              )}
+            </ul>
+            <Link href="/jobs" className="mt-4 inline-block text-sm font-medium text-forest">
+              Browse the full board
+            </Link>
+          </aside>
+        </div>
+      </section>
+
+      <section className="mx-auto w-full max-w-6xl px-4 py-8">
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {CATEGORIES.map((category) => (
+            <Link
+              key={category}
+              href={`/jobs?category=${encodeURIComponent(category)}`}
+              className="shrink-0 rounded-full border border-line bg-cream px-3 py-1.5 text-sm hover:border-forest"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+              {category}
+              <span className="ml-2 text-muted">{countByCategory.get(category) ?? 0}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto w-full max-w-6xl px-4 pb-4">
+        <div className="mb-3 flex items-end justify-between">
+          <h2 className="text-3xl">Fresh roles</h2>
+          <Link href="/jobs" className="text-sm font-medium text-forest">
+            See all
+          </Link>
+        </div>
+        <div className="overflow-hidden rounded-3xl border border-line bg-cream">
+          {latest.length === 0 ? (
+            <p className="px-4 py-10 text-muted">Roles will show up here once companies post them.</p>
+          ) : (
+            latest.map((job) => <JobRow key={job.id} job={job} />)
+          )}
+        </div>
+      </section>
+
+      <section className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-12 md:grid-cols-2">
+        <div className="rounded-3xl border border-line bg-cream p-6">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-copper">Looking</p>
+          <h2 className="mt-3 text-3xl">A desk for your search.</h2>
+          <ol className="mt-5 space-y-3 text-sm">
+            <li>1. Make a profile with a headline and a short bio.</li>
+            <li>2. Apply with a note the hiring team will actually read.</li>
+            <li>3. Save an alert. Matching open roles stay on your desk.</li>
+          </ol>
+          <Link href="/signup" className={`${btnPrimary} mt-6`}>
+            Create a free account
+          </Link>
+        </div>
+        <div className="rounded-3xl bg-forest p-6 text-cream">
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#d7c4ae]">Hiring</p>
+          <h2 className="mt-3 text-3xl text-cream">Put a role in front of people who are looking.</h2>
+          <p className="mt-4 max-w-md text-sm text-[#efe6da]">
+            Post in a few minutes. Applications arrive with a note and a profile, and you decide who moves forward.
           </p>
+          <Link href="/employers" className="mt-6 inline-flex rounded-full bg-cream px-4 py-2.5 text-sm font-medium text-forest">
+            Hire on JobAlert
+          </Link>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </section>
+    </main>
   );
 }

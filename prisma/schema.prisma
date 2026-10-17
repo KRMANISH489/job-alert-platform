@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  name         String
+  role         String
+  headline           String       @default("")
+  resumeHeadline     String       @default("")
+  location           String       @default("")
+  phone              String       @default("")
+  bio                String       @default("")
+  experienceYears    Int?
+  currentCompany     String       @default("")
+  currentCtc         Int?
+  expectedCtc        Int?
+  noticePeriod       String       @default("")
+  preferredLocations String       @default("")
+  preferredType      String       @default("")
+  dateOfBirth        String       @default("")
+  gender             String       @default("")
+  languages          String       @default("")
+  industry           String       @default("")
+  department         String       @default("")
+  companyId          String?
+  company            Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  applications       Application[]
+  savedJobs          SavedJob[]
+  alerts             JobAlert[]
+  skills             Skill[]
+  employments        Employment[]
+  educations         Education[]
+  createdAt          DateTime     @default(now())
+}
+
+model Skill {
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name    String
+  nameKey String
+
+  @@unique([userId, nameKey])
+  @@index([userId])
+}
+
+model Employment {
+  id          String  @id @default(cuid())
+  userId      String
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  designation String
+  company     String
+  location    String  @default("")
+  startMonth  Int
+  startYear   Int
+  endMonth    Int?
+  endYear     Int?
+  current     Boolean @default(false)
+  description String  @default("")
+
+  @@index([userId])
+}
+
+model Education {
+  id             String @id @default(cuid())
+  userId         String
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  degree         String
+  specialization String @default("")
+  institute      String
+  endYear        Int
+  score          String @default("")
+
+  @@index([userId])
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  website   String   @default("")
+  about     String   @default("")
+  location  String   @default("")
+  size      String   @default("")
+  hrName    String   @default("")
+  hrPhone   String   @default("")
+  hrEmail   String   @default("")
+  users     User[]
+  jobs      Job[]
+  createdAt DateTime @default(now())
+}
+
+model Job {
+  id           String        @id @default(cuid())
+  slug         String        @unique
+  title        String
+  companyId    String
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location     String
+  workplace    String
+  type         String
+  experience   String
+  salaryMin    Int?
+  salaryMax    Int?
+  currency     String        @default("INR")
+  category     String
+  description  String
+  requirements String
+  status       String        @default("open")
+  featured     Boolean       @default(false)
+  hrName       String        @default("")
+  hrPhone      String        @default("")
+  hrEmail      String        @default("")
+  createdAt    DateTime      @default(now())
+  applications Application[]
+  savedBy      SavedJob[]
+
+  @@index([status, featured, createdAt])
+}
+
+model Application {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note       String
+  resumeJson String   @default("")
+  status     String   @default("submitted")
+  createdAt DateTime @default(now())
+
+  @@unique([jobId, userId])
+  @@index([userId])
+}
+
+model SavedJob {
+  userId    String
+  jobId     String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, jobId])
+}
+
+model JobAlert {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  keyword   String
+  location  String   @default("")
+  category  String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
