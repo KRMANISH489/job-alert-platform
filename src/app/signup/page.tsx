@@ -17,10 +17,10 @@ export default async function SignupPage({
 
   return (
     <main className="mx-auto w-full max-w-xl px-4 py-12">
-      <h1 className="text-4xl md:text-5xl">{hiring ? "Post roles on JobAlert" : "Create your desk"}</h1>
+      <h1 className="text-4xl md:text-5xl">{hiring ? "Post roles on CareerRise" : "Create your desk"}</h1>
       <p className="mt-3 text-muted">
         {hiring
-          ? "Your company page and first listing can go up today."
+          ? "This creates a secondary admin for your company. The main admin must allow posting before a job goes live."
           : "A free account lets you apply, save roles, and keep alerts."}
       </p>
       <div className="mt-6">

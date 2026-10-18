@@ -7,10 +7,8 @@ import { ProfileStrength } from "@/components/seeker-profile";
 import { Field, Submit, fieldClass } from "@/components/ui";
 import { CATEGORIES, statusLabel } from "@/lib/constants";
 import { getSession, homeFor } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { timeAgo } from "@/lib/format";
-import { seekerProfileSelect } from "@/lib/profile";
-import { jobsForAlert } from "@/lib/queries";
+import { getDesk } from "@/lib/queries";
 import { createAlertAction, deleteAlertAction, unsaveJobAction } from "@/server/actions";
 
 export const metadata: Metadata = { title: "Your desk" };
@@ -25,25 +23,7 @@ export default async function AccountPage({
   if (session.role !== "seeker") redirect(homeFor(session.role));
 
   const params = await searchParams;
-  const [profile, applications, saved, alerts] = await Promise.all([
-    prisma.user.findUniqueOrThrow({
-      where: { id: session.id },
-      select: seekerProfileSelect,
-    }),
-    prisma.application.findMany({
-      where: { userId: session.id },
-      include: { job: { include: { company: true } } },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.savedJob.findMany({
-      where: { userId: session.id },
-      include: { job: { include: { company: true } } },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.jobAlert.findMany({ where: { userId: session.id }, orderBy: { createdAt: "desc" } }),
-  ]);
-
-  const matches = await Promise.all(alerts.map((alert) => jobsForAlert(alert)));
+  const { profile, applications, saved, alerts } = await getDesk();
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10">
@@ -80,7 +60,7 @@ export default async function AccountPage({
             </form>
             <div className="mt-4 space-y-4">
               {alerts.length === 0 ? <p className="text-sm text-muted">No alerts yet.</p> : null}
-              {alerts.map((alert, index) => (
+              {alerts.map((alert) => (
                 <article key={alert.id} className="rounded-3xl border border-line bg-cream p-4">
                   <div className="flex items-start justify-between gap-3">
                     <p className="font-medium">
@@ -96,8 +76,8 @@ export default async function AccountPage({
                     </form>
                   </div>
                   <div className="mt-3 overflow-hidden rounded-2xl border border-line">
-                    {matches[index]?.length ? (
-                      matches[index].map((job) => <JobRow key={job.id} job={job} />)
+                    {alert.jobs.length ? (
+                      alert.jobs.map((job) => <JobRow key={job.id} job={job} />)
                     ) : (
                       <p className="px-4 py-4 text-sm text-muted">Nothing open matches this yet.</p>
                     )}

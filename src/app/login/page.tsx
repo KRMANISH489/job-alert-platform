@@ -7,9 +7,9 @@ import { loginAction } from "@/server/actions";
 export const metadata: Metadata = { title: "Sign in" };
 
 const demos = [
-  { name: "Aisha Sen", detail: "Job seeker · designer in Pune", email: "aisha@jobalert.app" },
-  { name: "Meera Kapoor", detail: "Employer · Northline", email: "meera@northline.in" },
-  { name: "Admin", detail: "Feature or close any listing", email: "admin@jobalert.app" },
+  { name: "Aisha Sen", detail: "Applicant · designer in Pune", email: "aisha@jobalert.app" },
+  { name: "Meera Kapoor", detail: "Secondary admin · Northline, posts jobs after access", email: "meera@northline.in" },
+  { name: "Main admin", detail: "Gives companies access to post, and controls the board", email: "admin@jobalert.app" },
 ];
 
 export default async function LoginPage({

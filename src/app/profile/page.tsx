@@ -3,8 +3,7 @@ import { redirect } from "next/navigation";
 import { Flash } from "@/components/flash";
 import { SeekerProfileView } from "@/components/seeker-profile";
 import { getSession, homeFor } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { seekerProfileSelect } from "@/lib/profile";
+import { getProfile } from "@/lib/queries";
 
 export const metadata: Metadata = { title: "Profile" };
 
@@ -19,7 +18,7 @@ export default async function ProfilePage({
 
   const [params, profile] = await Promise.all([
     searchParams,
-    prisma.user.findUniqueOrThrow({ where: { id: session.id }, select: seekerProfileSelect }),
+    getProfile(),
   ]);
 
   return (

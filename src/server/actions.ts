@@ -1,16 +1,12 @@
 "use server";
 
-import { hash, compare } from "bcryptjs";
-import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { api, ApiError } from "@/lib/api";
+import { hasCallablePhone } from "@/lib/resume";
 import { APPLICATION_STATUSES, CATEGORIES, COMPANY_SIZES } from "@/lib/constants";
 import { clearSessionCookie, getSession, homeFor, safeNext, setSessionCookie } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { seekerProfileSelect } from "@/lib/profile";
-import { buildResume, hasCallablePhone } from "@/lib/resume";
-import { uniqueCompanySlug, uniqueJobSlug } from "@/lib/slug";
 
 function redirectWith(path: string, extra: Record<string, string>): never {
   const url = new URL(path, "http://localhost");
@@ -54,31 +50,16 @@ export async function signupAction(formData: FormData) {
     redirectWith(back, { error: "Add your company name.", next });
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) redirectWith(back, { error: "An account with that email already exists. Sign in instead.", next });
-
-  const passwordHash = await hash(password, 10);
-  const company =
-    role === "employer"
-      ? await prisma.company.create({
-          data: {
-            name: companyName,
-            slug: await uniqueCompanySlug(companyName),
-          },
-        })
-      : null;
-
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      passwordHash,
-      role,
-      companyId: company?.id,
-    },
-  });
-
-  await setSessionCookie(user.id);
+  try {
+    const user = await api<{ id: string }>("/auth/signup", {
+      method: "POST",
+      body: { name, email, password, role, companyName },
+    });
+    await setSessionCookie(user.id);
+  } catch (error) {
+    if (error instanceof ApiError) redirectWith(back, { error: error.message, next });
+    throw error;
+  }
   redirect(next || homeFor(role));
 }
 
@@ -86,14 +67,17 @@ export async function loginAction(formData: FormData) {
   const next = safeNext(formData.get("next"));
   const email = field(formData, "email").toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
-  const matches = user ? await compare(password, user.passwordHash) : false;
-  if (!user || !matches) {
-    redirectWith("/login", { error: "That email and password don't match.", next });
+  try {
+    const user = await api<{ id: string; role: string }>("/auth/login", {
+      method: "POST",
+      body: { email, password },
+    });
+    await setSessionCookie(user.id);
+    redirect(next || homeFor(user.role));
+  } catch (error) {
+    if (error instanceof ApiError) redirectWith("/login", { error: error.message, next });
+    throw error;
   }
-
-  await setSessionCookie(user.id);
-  redirect(next || homeFor(user.role));
 }
 
 export async function logoutAction() {
@@ -132,19 +116,25 @@ export async function updateCompanyAction(formData: FormData) {
   const contact = readContact(formData);
   if (!contact.ok) redirectWith("/hire", { error: contact.error });
 
-  await prisma.company.update({
-    where: { id: session.companyId },
-    data: {
-      name: name.slice(0, 80),
-      location: location.slice(0, 80),
-      size,
-      about: about.slice(0, 800),
-      website,
-      hrName: contact.hrName,
-      hrPhone: contact.hrPhone,
-      hrEmail: contact.hrEmail,
-    },
-  });
+  try {
+    await api("/hire/company", {
+      method: "PATCH",
+      auth: true,
+      body: {
+        name: name.slice(0, 80),
+        location: location.slice(0, 80),
+        size,
+        about: about.slice(0, 800),
+        website,
+        hrName: contact.hrName,
+        hrPhone: contact.hrPhone,
+        hrEmail: contact.hrEmail,
+      },
+    });
+  } catch (error) {
+    if (error instanceof ApiError) redirectWith("/hire", { error: error.message });
+    throw error;
+  }
 
   revalidatePath("/hire");
   redirectWith("/hire", { notice: "Company profile saved." });
@@ -160,32 +150,14 @@ export async function applyAction(formData: FormData) {
   if (note.length < 20) redirectWith(`/jobs/${slug}`, { error: "Write at least a couple of sentences." });
   if (note.length > 2000) redirectWith(`/jobs/${slug}`, { error: "Keep the note under 2,000 characters." });
 
-  const job = await prisma.job.findFirst({ where: { slug, status: "open" } });
-  if (!job) redirect("/jobs");
-
-  const profile = await prisma.user.findUnique({
-    where: { id: session.id },
-    select: seekerProfileSelect,
-  });
-  if (!profile || !hasCallablePhone(profile.phone)) {
-    redirectWith(`/jobs/${slug}`, {
-      error: "Add your phone number on your profile. The company receives it with your resume.",
-    });
-  }
-
   try {
-    await prisma.application.create({
-      data: {
-        jobId: job.id,
-        userId: session.id,
-        note,
-        resumeJson: JSON.stringify(buildResume(profile)),
-      },
-    });
+    await api(`/jobs/${slug}/apply`, { method: "POST", auth: true, body: { note } });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      redirectWith(`/jobs/${slug}`, { notice: "You already applied to this role." });
+    if (error instanceof ApiError && error.status === 409) {
+      redirectWith(`/jobs/${slug}`, { notice: error.message });
     }
+    if (error instanceof ApiError && error.status === 404) redirect("/jobs");
+    if (error instanceof ApiError) redirectWith(`/jobs/${slug}`, { error: error.message });
     throw error;
   }
 
@@ -201,14 +173,13 @@ export async function saveJobAction(formData: FormData) {
   if (!session) redirect(`/login?next=/jobs/${slug}`);
   if (session.role !== "seeker") redirectWith(`/jobs/${slug}`, { error: "Saving roles is for job seeker accounts." });
 
-  const job = await prisma.job.findFirst({ where: { slug, status: "open" } });
-  if (!job) redirect("/jobs");
-
-  await prisma.savedJob.upsert({
-    where: { userId_jobId: { userId: session.id, jobId: job.id } },
-    create: { userId: session.id, jobId: job.id },
-    update: {},
-  });
+  try {
+    await api(`/jobs/${slug}/save`, { method: "POST", auth: true });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) redirect("/jobs");
+    if (error instanceof ApiError) redirectWith(`/jobs/${slug}`, { error: error.message });
+    throw error;
+  }
 
   revalidatePath("/account");
   redirectWith(`/jobs/${slug}`, { notice: "Saved to your desk." });
@@ -220,10 +191,7 @@ export async function unsaveJobAction(formData: FormData) {
   const session = await getSession();
   if (!session) redirect("/login?next=/account");
 
-  const job = slug ? await prisma.job.findUnique({ where: { slug } }) : null;
-  if (job) {
-    await prisma.savedJob.deleteMany({ where: { userId: session.id, jobId: job.id } });
-  }
+  if (slug) await api(`/jobs/${slug}/save`, { method: "DELETE", auth: true });
 
   revalidatePath("/account");
   redirect(returnTo || (slug ? `/jobs/${slug}` : "/account"));
@@ -242,17 +210,16 @@ export async function createAlertAction(formData: FormData) {
     redirectWith("/account", { error: "Pick a category from the list." });
   }
 
-  const count = await prisma.jobAlert.count({ where: { userId: session.id } });
-  if (count >= 8) redirectWith("/account", { error: "You can keep up to 8 alerts. Remove one to add another." });
-
-  await prisma.jobAlert.create({
-    data: {
-      userId: session.id,
-      keyword: keyword.slice(0, 60),
-      location: location.slice(0, 60),
-      category,
-    },
-  });
+  try {
+    await api("/me/alerts", {
+      method: "POST",
+      auth: true,
+      body: { keyword: keyword.slice(0, 60), location: location.slice(0, 60), category },
+    });
+  } catch (error) {
+    if (error instanceof ApiError) redirectWith("/account", { error: error.message });
+    throw error;
+  }
 
   revalidatePath("/account");
   redirectWith("/account", { notice: "Alert saved. Matching open roles are listed under it." });
@@ -262,7 +229,7 @@ export async function deleteAlertAction(formData: FormData) {
   const session = await getSession();
   if (!session) redirect("/login?next=/account");
   const id = field(formData, "id");
-  await prisma.jobAlert.deleteMany({ where: { id, userId: session.id } });
+  await api(`/me/alerts/${id}`, { method: "DELETE", auth: true });
   revalidatePath("/account");
   redirect("/account");
 }
@@ -314,6 +281,27 @@ function readJob(formData: FormData, includeStatus: boolean) {
   return parsed;
 }
 
+export async function setCompanyAccessAction(formData: FormData) {
+  const session = await getSession();
+  if (!session || session.role !== "admin") redirect("/login?next=/admin");
+
+  const id = field(formData, "id");
+  const approved = field(formData, "approved") === "true";
+  let company: { name: string; approved: boolean };
+  try {
+    company = await api(`/admin/companies/${id}`, { method: "PATCH", auth: true, body: { approved } });
+  } catch (error) {
+    if (error instanceof ApiError) redirect("/admin");
+    throw error;
+  }
+  revalidatePath("/admin");
+  revalidatePath("/hire");
+  revalidatePath("/hire/new");
+  redirectWith("/admin", {
+    notice: company.approved ? `${company.name} can post jobs.` : `${company.name} can no longer post jobs.`,
+  });
+}
+
 export async function createJobAction(formData: FormData) {
   const session = await getSession();
   if (!session || session.role !== "employer" || !session.companyId) redirect("/employers");
@@ -331,19 +319,24 @@ export async function createJobAction(formData: FormData) {
   const contact = readContact(formData);
   if (!contact.ok) redirectWith("/hire/new", { error: contact.error });
 
-  const job = await prisma.job.create({
-    data: {
-      ...parsed.data,
-      status: "open",
-      salaryMin: salaryMin.value,
-      salaryMax: salaryMax.value,
-      slug: await uniqueJobSlug(parsed.data.title),
-      companyId: session.companyId,
-      hrName: contact.hrName,
-      hrPhone: contact.hrPhone,
-      hrEmail: contact.hrEmail,
-    },
-  });
+  let job: { id: string; slug: string };
+  try {
+    job = await api("/hire/jobs", {
+      method: "POST",
+      auth: true,
+      body: {
+        ...parsed.data,
+        salaryMin: salaryMin.value,
+        salaryMax: salaryMax.value,
+        hrName: contact.hrName,
+        hrPhone: contact.hrPhone,
+        hrEmail: contact.hrEmail,
+      },
+    });
+  } catch (error) {
+    if (error instanceof ApiError) redirectWith("/hire/new", { error: error.message });
+    throw error;
+  }
 
   refreshBoard(job.slug);
   redirectWith(`/hire/jobs/${job.id}`, { notice: "Role is live on the board." });
@@ -354,9 +347,6 @@ export async function updateJobAction(formData: FormData) {
   if (!session || session.role !== "employer" || !session.companyId) redirect("/employers");
 
   const id = field(formData, "id");
-  const existing = await prisma.job.findFirst({ where: { id, companyId: session.companyId } });
-  if (!existing) redirect("/hire");
-
   const back = `/hire/jobs/${id}`;
   const parsed = readJob(formData, true);
   if (!parsed.success) redirectWith(back, { error: parsed.error.issues[0]?.message ?? "Check the form." });
@@ -371,17 +361,25 @@ export async function updateJobAction(formData: FormData) {
   const contact = readContact(formData);
   if (!contact.ok) redirectWith(back, { error: contact.error });
 
-  await prisma.job.update({
-    where: { id },
-    data: {
-      ...parsed.data,
-      salaryMin: salaryMin.value,
-      salaryMax: salaryMax.value,
-      hrName: contact.hrName,
-      hrPhone: contact.hrPhone,
-      hrEmail: contact.hrEmail,
-    },
-  });
+  let existing: { slug: string };
+  try {
+    existing = await api(`/hire/jobs/${id}`, {
+      method: "PATCH",
+      auth: true,
+      body: {
+        ...parsed.data,
+        salaryMin: salaryMin.value,
+        salaryMax: salaryMax.value,
+        hrName: contact.hrName,
+        hrPhone: contact.hrPhone,
+        hrEmail: contact.hrEmail,
+      },
+    });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) redirect("/hire");
+    if (error instanceof ApiError) redirectWith(back, { error: error.message });
+    throw error;
+  }
 
   refreshBoard(existing.slug);
   redirectWith(back, { notice: "Role updated." });
@@ -395,13 +393,17 @@ export async function setApplicationStatusAction(formData: FormData) {
   const status = field(formData, "status");
   if (!APPLICATION_STATUSES.some((item) => item.value === status)) redirect("/hire");
 
-  const application = await prisma.application.findFirst({
-    where: { id: applicationId, job: { companyId: session.companyId } },
-    select: { id: true, jobId: true },
-  });
-  if (!application) redirect("/hire");
-
-  await prisma.application.update({ where: { id: application.id }, data: { status } });
+  let application: { jobId: string };
+  try {
+    application = await api(`/hire/applications/${applicationId}`, {
+      method: "PATCH",
+      auth: true,
+      body: { status },
+    });
+  } catch (error) {
+    if (error instanceof ApiError) redirect("/hire");
+    throw error;
+  }
   revalidatePath(`/hire/jobs/${application.jobId}`);
   revalidatePath("/account");
   redirectWith(`/hire/jobs/${application.jobId}`, { notice: "Applicant status updated." });
@@ -414,16 +416,20 @@ export async function setJobFlagsAction(formData: FormData) {
   const id = field(formData, "id");
   const status = field(formData, "status");
   const featured = field(formData, "featured");
-  const job = await prisma.job.findUnique({ where: { id } });
-  if (!job) redirect("/admin");
-
-  await prisma.job.update({
-    where: { id },
-    data: {
-      ...(status === "open" || status === "closed" ? { status } : {}),
-      ...(featured === "true" || featured === "false" ? { featured: featured === "true" } : {}),
-    },
-  });
+  let job: { slug: string };
+  try {
+    job = await api(`/admin/jobs/${id}`, {
+      method: "PATCH",
+      auth: true,
+      body: {
+        status: status === "open" || status === "closed" ? status : null,
+        featured: featured === "true" ? true : featured === "false" ? false : null,
+      },
+    });
+  } catch (error) {
+    if (error instanceof ApiError) redirect("/admin");
+    throw error;
+  }
 
   refreshBoard(job.slug);
   redirectWith("/admin", { notice: "Listing updated." });

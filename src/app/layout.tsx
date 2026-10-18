@@ -17,11 +17,11 @@ const fraunces = Fraunces({
 
 export const metadata: Metadata = {
   title: {
-    default: "JobAlert",
-    template: "%s · JobAlert",
+    default: "CareerRise",
+    template: "%s · CareerRise",
   },
   description:
-    "A straightforward job board. Search open roles, apply with a short note, and keep alerts for the work you want.",
+    "CareerRise is a job board. Search open roles, send your full resume, and keep alerts for the work you want.",
 };
 
 export const dynamic = "force-dynamic";

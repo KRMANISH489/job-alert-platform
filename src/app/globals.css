@@ -1,17 +1,19 @@
 @import "tailwindcss";
 
 :root {
-  --paper: #f6f3ec;
-  --paper-deep: #ebe4d8;
-  --cream: #fffcf7;
-  --ink: #1b1916;
-  --muted: #5c564e;
-  --line: #e3dcd1;
-  --forest: #1e4a38;
-  --forest-deep: #143528;
-  --copper: #8d451c;
-  --sand: #f3e6d4;
-  --danger: #8c2f2f;
+  --paper: #ffffff;
+  --paper-deep: #f3f3f3;
+  --cream: #ffffff;
+  --ink: #1a1a1a;
+  --muted: #5e5e5e;
+  --line: #e8e8e8;
+  --rise: #f7941d;
+  --rise-deep: #e08512;
+  --forest: #f7941d;
+  --forest-deep: #e08512;
+  --copper: #f7941d;
+  --sand: #fff4e4;
+  --danger: #c62828;
 }
 
 @theme inline {
@@ -21,6 +23,8 @@
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-line: var(--line);
+  --color-rise: var(--rise);
+  --color-rise-deep: var(--rise-deep);
   --color-forest: var(--forest);
   --color-forest-deep: var(--forest-deep);
   --color-copper: var(--copper);
@@ -37,9 +41,7 @@ html {
 
 body {
   min-height: 100%;
-  background:
-    radial-gradient(900px 420px at 0% -10%, rgba(154, 78, 36, 0.07), transparent 55%),
-    var(--paper);
+  background: var(--paper);
   color: var(--ink);
   font-family: var(--font-outfit), "Segoe UI", sans-serif;
 }
@@ -53,7 +55,7 @@ h3 {
 }
 
 ::selection {
-  background: #e7d3c4;
+  background: #ffe2b8;
 }
 
 :focus-visible {

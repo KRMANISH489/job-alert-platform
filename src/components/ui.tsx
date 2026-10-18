@@ -4,7 +4,7 @@ export const fieldClass =
   "w-full rounded-xl border border-line bg-cream px-3 py-2.5 text-sm text-ink outline-none placeholder:text-muted/80";
 
 export const btnPrimary =
-  "inline-flex items-center justify-center rounded-full bg-forest px-4 py-2.5 text-sm font-medium text-cream transition hover:bg-forest-deep";
+  "inline-flex items-center justify-center rounded-full bg-rise px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-rise-deep";
 
 export const btnGhost =
   "inline-flex items-center justify-center rounded-full border border-line bg-cream px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper-deep";

@@ -7,9 +7,8 @@ import { Submit, fieldClass } from "@/components/ui";
 import { ResumeSheet } from "@/components/resume-sheet";
 import { APPLICATION_STATUSES, statusLabel } from "@/lib/constants";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { timeAgo } from "@/lib/format";
-import { seekerProfileSelect } from "@/lib/profile";
+import { getEmployerJob } from "@/lib/queries";
 import { buildResume, parseResume } from "@/lib/resume";
 import { setApplicationStatusAction, updateJobAction } from "@/server/actions";
 
@@ -28,18 +27,7 @@ export default async function EmployerJobPage({
   if (!session) redirect(`/login?next=/hire/jobs/${id}`);
   if (session.role !== "employer" || !session.companyId) redirect("/employers");
 
-  const job = await prisma.job.findFirst({
-    where: { id, companyId: session.companyId },
-    include: {
-      applications: {
-        include: {
-          user: { select: seekerProfileSelect },
-        },
-        orderBy: { createdAt: "desc" },
-      },
-    },
-  });
-
+  const job = await getEmployerJob(id);
   if (!job) notFound();
 
   return (

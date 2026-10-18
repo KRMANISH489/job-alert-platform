@@ -1,4 +1,4 @@
-const tones = ["#1e4a38", "#9a4e24", "#1f3a5f", "#6b3f69", "#3f4f22", "#7a3e2e", "#24515a"];
+const tones = ["#f7941d", "#ff9f2a", "#f0a020", "#ffb03a", "#e8942a", "#ffc14d", "#f7941d"];
 
 function tone(seed: string) {
   let index = 0;
@@ -18,7 +18,7 @@ export function Mark({ name, size = "md" }: { name: string; size?: "md" | "lg" }
   return (
     <span
       aria-hidden
-      className={`grid shrink-0 place-items-center rounded-xl font-medium text-cream ${box}`}
+      className={`grid shrink-0 place-items-center rounded-xl font-medium text-ink ${box}`}
       style={{ background: tone(name) }}
     >
       {letters}

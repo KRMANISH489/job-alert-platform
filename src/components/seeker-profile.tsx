@@ -195,7 +195,7 @@ export function SeekerProfileView({ profile, editable }: { profile: SeekerProfil
               <span className="font-medium">{percent}%</span>
             </div>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-paper-deep">
-              <div className="h-full rounded-full bg-forest" style={{ width: `${percent}%` }} />
+              <div className="h-full rounded-full bg-rise" style={{ width: `${percent}%` }} />
             </div>
             <p className="mt-2 text-xs leading-5 text-muted">
               {missing.length === 0
@@ -518,7 +518,7 @@ export function ProfileStrength({ profile }: { profile: SeekerProfile }) {
       </div>
       <p className="mt-4 text-sm">{percent}% profile complete</p>
       <div className="mt-2 h-2 overflow-hidden rounded-full bg-paper-deep">
-        <div className="h-full rounded-full bg-forest" style={{ width: `${percent}%` }} />
+        <div className="h-full rounded-full bg-rise" style={{ width: `${percent}%` }} />
       </div>
       <Link href="/profile" className={`${btnGhost} mt-4 w-full`}>
         Open profile

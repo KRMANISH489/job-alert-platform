@@ -8,7 +8,7 @@ export default function ErrorPage({ reset }: { error: Error; reset: () => void }
       <button
         type="button"
         onClick={reset}
-        className="mt-6 inline-flex rounded-full bg-forest px-4 py-2.5 text-sm font-medium text-cream"
+        className="mt-6 inline-flex rounded-full bg-rise px-4 py-2.5 text-sm font-medium text-ink"
       >
         Try again
       </button>

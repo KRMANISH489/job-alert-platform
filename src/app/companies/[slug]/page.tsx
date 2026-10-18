@@ -3,8 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { JobRow } from "@/components/job-row";
 import { Mark } from "@/components/mark";
-import { prisma } from "@/lib/db";
-import { getCompanyBySlug, jobCardInclude } from "@/lib/queries";
+import { getCompanyPage } from "@/lib/queries";
 
 export async function generateMetadata({
   params,
@@ -12,21 +11,16 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const company = await getCompanyBySlug(slug);
-  if (!company) return { title: "Company not found" };
-  return { title: company.name, description: company.about || `Open roles at ${company.name}` };
+  const page = await getCompanyPage(slug);
+  if (!page) return { title: "Company not found" };
+  return { title: page.company.name, description: page.company.about || `Open roles at ${page.company.name}` };
 }
 
 export default async function CompanyPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const company = await getCompanyBySlug(slug);
-  if (!company) notFound();
-
-  const jobs = await prisma.job.findMany({
-    where: { companyId: company.id, status: "open" },
-    include: jobCardInclude,
-    orderBy: { createdAt: "desc" },
-  });
+  const page = await getCompanyPage(slug);
+  if (!page) notFound();
+  const { company, jobs } = page;
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10">
@@ -35,7 +29,7 @@ export default async function CompanyPage({ params }: { params: Promise<{ slug: 
         <div>
           <h1 className="text-4xl md:text-5xl">{company.name}</h1>
           <p className="mt-2 text-muted">
-            {[company.location, company.size].filter(Boolean).join(" · ") || "Hiring on JobAlert"}
+            {[company.location, company.size].filter(Boolean).join(" · ") || "Hiring on CareerRise"}
           </p>
         </div>
       </div>

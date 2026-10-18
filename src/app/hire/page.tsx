@@ -5,8 +5,8 @@ import { Flash } from "@/components/flash";
 import { Field, Submit, btnPrimary, fieldClass } from "@/components/ui";
 import { COMPANY_SIZES } from "@/lib/constants";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { formatSalary, timeAgo } from "@/lib/format";
+import { getHireHome } from "@/lib/queries";
 import { updateCompanyAction } from "@/server/actions";
 
 export const metadata: Metadata = { title: "Hiring" };
@@ -21,25 +21,25 @@ export default async function HirePage({
   if (session.role !== "employer" || !session.companyId) redirect("/employers");
 
   const params = await searchParams;
-  const [company, jobs] = await Promise.all([
-    prisma.company.findUniqueOrThrow({ where: { id: session.companyId } }),
-    prisma.job.findMany({
-      where: { companyId: session.companyId },
-      include: { _count: { select: { applications: true } } },
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
+  const { company, jobs } = await getHireHome();
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-4xl md:text-5xl">{company.name}</h1>
-          <p className="mt-3 text-muted">Post a role, then review the notes people send you.</p>
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-copper">Secondary admin</p>
+          <h1 className="mt-2 text-4xl md:text-5xl">{company.name}</h1>
+          <p className="mt-3 text-muted">
+            {company.approved
+              ? "The main admin has allowed this company to post jobs. Review the resumes people send."
+              : "Waiting for the main admin. Job posts stay locked until that access is given."}
+          </p>
         </div>
-        <Link href="/hire/new" className={btnPrimary}>
-          Post a role
-        </Link>
+        {company.approved ? (
+          <Link href="/hire/new" className={btnPrimary}>
+            Post a role
+          </Link>
+        ) : null}
       </div>
       <div className="mt-6">
         <Flash searchParams={params} />
@@ -103,7 +103,7 @@ export default async function HirePage({
                 </div>
                 <div className="text-right text-sm">
                   <p className="font-medium">
-                    {job._count.applications} {job._count.applications === 1 ? "applicant" : "applicants"}
+                    {job._count?.applications ?? 0} {(job._count?.applications ?? 0) === 1 ? "applicant" : "applicants"}
                   </p>
                   <p className="text-muted">{job.status === "open" ? "Open" : "Closed"}</p>
                 </div>

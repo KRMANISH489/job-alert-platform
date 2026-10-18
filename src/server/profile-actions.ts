@@ -1,11 +1,10 @@
 "use server";
 
-import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { api, ApiError } from "@/lib/api";
 import { GENDERS, JOB_TYPES, NOTICE_PERIODS } from "@/lib/constants";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 
 function redirectWith(path: string, extra: Record<string, string>): never {
   const url = new URL(path, "http://localhost");
@@ -69,9 +68,10 @@ export async function updateBasicProfileAction(formData: FormData) {
   if (name.length < 2) redirectWith("/profile", { error: "Name is required." });
   if (!years.ok) redirectWith("/profile", { error: "Experience should be a whole number of years, or left blank." });
 
-  await prisma.user.update({
-    where: { id: session.id },
-    data: {
+  await api("/me/profile/basic", {
+    method: "PATCH",
+    auth: true,
+    body: {
       name: name.slice(0, 80),
       headline: field(formData, "headline").slice(0, 120),
       currentCompany: field(formData, "currentCompany").slice(0, 80),
@@ -104,9 +104,10 @@ export async function updateCareerAction(formData: FormData) {
     redirectWith("/profile", { error: "Pick a job type from the list." });
   }
 
-  await prisma.user.update({
-    where: { id: session.id },
-    data: {
+  await api("/me/profile/career", {
+    method: "PATCH",
+    auth: true,
+    body: {
       currentCtc: currentCtc.value,
       expectedCtc: expectedCtc.value,
       noticePeriod,
@@ -137,13 +138,10 @@ export async function updatePersonalAction(formData: FormData) {
     redirectWith("/profile", { error: "Pick a gender option from the list." });
   }
 
-  await prisma.user.update({
-    where: { id: session.id },
-    data: {
-      dateOfBirth,
-      gender,
-      languages: field(formData, "languages").slice(0, 120),
-    },
+  await api("/me/profile/personal", {
+    method: "PATCH",
+    auth: true,
+    body: { dateOfBirth, gender, languages: field(formData, "languages").slice(0, 120) },
   });
 
   refreshProfile();
@@ -157,17 +155,11 @@ export async function addSkillAction(formData: FormData) {
     redirectWith("/profile", { error: "A skill should be 2–40 characters." });
   }
 
-  const count = await prisma.skill.count({ where: { userId: session.id } });
-  if (count >= 20) redirectWith("/profile", { error: "You can list up to 20 skills." });
-
   try {
-    await prisma.skill.create({
-      data: { userId: session.id, name, nameKey: name.toLowerCase() },
-    });
+    await api("/me/skills", { method: "POST", auth: true, body: { name } });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      redirectWith("/profile", { notice: "That skill is already on your profile." });
-    }
+    if (error instanceof ApiError && error.status === 409) redirectWith("/profile", { notice: error.message });
+    if (error instanceof ApiError) redirectWith("/profile", { error: error.message });
     throw error;
   }
 
@@ -177,7 +169,7 @@ export async function addSkillAction(formData: FormData) {
 
 export async function removeSkillAction(formData: FormData) {
   const session = await requireSeeker();
-  await prisma.skill.deleteMany({ where: { id: field(formData, "id"), userId: session.id } });
+  await api(`/me/skills/${field(formData, "id")}`, { method: "DELETE", auth: true });
   refreshProfile();
   redirect("/profile");
 }
@@ -218,14 +210,11 @@ export async function saveEmploymentAction(formData: FormData) {
     description: field(formData, "description").slice(0, 1000),
   };
 
-  if (id) {
-    const existing = await prisma.employment.findFirst({ where: { id, userId: session.id } });
-    if (!existing) redirect("/profile");
-    await prisma.employment.update({ where: { id }, data });
-  } else {
-    const count = await prisma.employment.count({ where: { userId: session.id } });
-    if (count >= 12) redirectWith("/profile", { error: "You can add up to 12 jobs." });
-    await prisma.employment.create({ data: { ...data, userId: session.id } });
+  try {
+    await api("/me/employment", { method: "POST", auth: true, body: { id, ...data } });
+  } catch (error) {
+    if (error instanceof ApiError) redirectWith("/profile", { error: error.message });
+    throw error;
   }
 
   refreshProfile();
@@ -234,7 +223,7 @@ export async function saveEmploymentAction(formData: FormData) {
 
 export async function deleteEmploymentAction(formData: FormData) {
   const session = await requireSeeker();
-  await prisma.employment.deleteMany({ where: { id: field(formData, "id"), userId: session.id } });
+  await api(`/me/employment/${field(formData, "id")}`, { method: "DELETE", auth: true });
   refreshProfile();
   redirect("/profile");
 }
@@ -259,14 +248,11 @@ export async function saveEducationAction(formData: FormData) {
     score: field(formData, "score").slice(0, 40),
   };
 
-  if (id) {
-    const existing = await prisma.education.findFirst({ where: { id, userId: session.id } });
-    if (!existing) redirect("/profile");
-    await prisma.education.update({ where: { id }, data });
-  } else {
-    const count = await prisma.education.count({ where: { userId: session.id } });
-    if (count >= 8) redirectWith("/profile", { error: "You can add up to 8 qualifications." });
-    await prisma.education.create({ data: { ...data, userId: session.id } });
+  try {
+    await api("/me/education", { method: "POST", auth: true, body: { id, ...data } });
+  } catch (error) {
+    if (error instanceof ApiError) redirectWith("/profile", { error: error.message });
+    throw error;
   }
 
   refreshProfile();
@@ -275,7 +261,7 @@ export async function saveEducationAction(formData: FormData) {
 
 export async function deleteEducationAction(formData: FormData) {
   const session = await requireSeeker();
-  await prisma.education.deleteMany({ where: { id: field(formData, "id"), userId: session.id } });
+  await api(`/me/education/${field(formData, "id")}`, { method: "DELETE", auth: true });
   refreshProfile();
   redirect("/profile");
 }

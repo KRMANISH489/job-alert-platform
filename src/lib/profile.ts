@@ -1,55 +1,48 @@
-import { Prisma } from "@prisma/client";
 import { MONTHS } from "@/lib/constants";
 
-export const seekerProfileSelect = {
-  id: true,
-  name: true,
-  email: true,
-  phone: true,
-  headline: true,
-  resumeHeadline: true,
-  location: true,
-  bio: true,
-  experienceYears: true,
-  currentCompany: true,
-  currentCtc: true,
-  expectedCtc: true,
-  noticePeriod: true,
-  preferredLocations: true,
-  preferredType: true,
-  dateOfBirth: true,
-  gender: true,
-  languages: true,
-  industry: true,
-  department: true,
-  skills: { select: { id: true, name: true } },
+export type SeekerProfile = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  headline: string;
+  resumeHeadline: string;
+  location: string;
+  bio: string;
+  experienceYears: number | null;
+  currentCompany: string;
+  currentCtc: number | null;
+  expectedCtc: number | null;
+  noticePeriod: string;
+  preferredLocations: string;
+  preferredType: string;
+  dateOfBirth: string;
+  gender: string;
+  languages: string;
+  industry: string;
+  department: string;
+  skills: { id: string; name: string }[];
   employments: {
-    select: {
-      id: true,
-      designation: true,
-      company: true,
-      location: true,
-      startMonth: true,
-      startYear: true,
-      endMonth: true,
-      endYear: true,
-      current: true,
-      description: true,
-    },
-  },
+    id: string;
+    designation: string;
+    company: string;
+    location: string;
+    startMonth: number;
+    startYear: number;
+    endMonth: number | null;
+    endYear: number | null;
+    current: boolean;
+    description: string;
+  }[];
   educations: {
-    select: {
-      id: true,
-      degree: true,
-      specialization: true,
-      institute: true,
-      endYear: true,
-      score: true,
-    },
-  },
-} satisfies Prisma.UserSelect;
-
-export type SeekerProfile = Prisma.UserGetPayload<{ select: typeof seekerProfileSelect }>;
+    id: string;
+    degree: string;
+    specialization: string;
+    institute: string;
+    endYear: number;
+    score: string;
+  }[];
+};
 
 export function profileCompleteness(profile: SeekerProfile) {
   const checks = [

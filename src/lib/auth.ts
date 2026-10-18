@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { cache } from "react";
-import { prisma } from "@/lib/db";
+import { api, ApiError } from "@/lib/api";
 
 const COOKIE = "ja_session";
 const MAX_AGE = 60 * 60 * 24 * 30;
@@ -56,18 +56,13 @@ export const getSession = cache(async (): Promise<SessionUser | null> => {
   if (!token) return null;
   const parsed = decodeSession(token);
   if (!parsed) return null;
-  const user = await prisma.user.findUnique({
-    where: { id: parsed.userId },
-    select: { id: true, email: true, name: true, role: true, companyId: true },
-  });
-  if (!user) return null;
-  return {
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    role: asRole(user.role),
-    companyId: user.companyId,
-  };
+  try {
+    const user = await api<SessionUser>("/auth/me", { auth: true });
+    return { ...user, role: asRole(user.role) };
+  } catch (error) {
+    if (error instanceof ApiError) return null;
+    throw error;
+  }
 });
 
 export async function setSessionCookie(userId: string) {
@@ -89,7 +84,7 @@ export async function clearSessionCookie() {
 export function homeFor(role: string) {
   if (role === "employer") return "/hire";
   if (role === "admin") return "/admin";
-  return "/account";
+  return "/";
 }
 
 export function safeNext(value: FormDataEntryValue | null) {

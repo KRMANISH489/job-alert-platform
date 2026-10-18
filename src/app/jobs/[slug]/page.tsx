@@ -6,10 +6,8 @@ import { Mark } from "@/components/mark";
 import { Submit, btnGhost, fieldClass } from "@/components/ui";
 import { EXPERIENCE, JOB_TYPES, WORKPLACES, labelOf, statusLabel } from "@/lib/constants";
 import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { formatSalary, lines, paragraphs, timeAgo } from "@/lib/format";
-import { seekerProfileSelect } from "@/lib/profile";
-import { getOpenJob } from "@/lib/queries";
+import { getJobContext, getOpenJob } from "@/lib/queries";
 import { hasCallablePhone, telHref } from "@/lib/resume";
 import { applyAction, saveJobAction, unsaveJobAction } from "@/server/actions";
 
@@ -39,25 +37,10 @@ export default async function JobPage({
   const [job, session] = await Promise.all([getOpenJob(slug), getSession()]);
   if (!job) notFound();
 
-  const seekerId = session?.role === "seeker" ? session.id : null;
-  const [application, saved, profile] = await Promise.all([
-    seekerId
-      ? prisma.application.findUnique({
-          where: { jobId_userId: { jobId: job.id, userId: seekerId } },
-        })
-      : null,
-    seekerId
-      ? prisma.savedJob.findUnique({
-          where: { userId_jobId: { userId: seekerId, jobId: job.id } },
-        })
-      : null,
-    seekerId
-      ? prisma.user.findUnique({
-          where: { id: seekerId },
-          select: seekerProfileSelect,
-        })
-      : null,
-  ]);
+  const context = session?.role === "seeker" ? await getJobContext(slug) : null;
+  const application = context?.application ?? null;
+  const saved = context?.saved ?? false;
+  const profile = context?.profile ?? null;
   const hrPhoneLink = telHref(job.hrPhone);
 
   const facts = [

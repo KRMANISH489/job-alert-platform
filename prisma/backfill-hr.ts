@@ -1,6 +1,47 @@
-import { PrismaClient } from "@prisma/client";
-import { seekerProfileSelect } from "../src/lib/profile";
+import { Prisma, PrismaClient } from "@prisma/client";
+import type { SeekerProfile } from "../src/lib/profile";
 import { buildResume } from "../src/lib/resume";
+
+const seekerProfileSelect = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  headline: true,
+  resumeHeadline: true,
+  location: true,
+  bio: true,
+  experienceYears: true,
+  currentCompany: true,
+  currentCtc: true,
+  expectedCtc: true,
+  noticePeriod: true,
+  preferredLocations: true,
+  preferredType: true,
+  dateOfBirth: true,
+  gender: true,
+  languages: true,
+  industry: true,
+  department: true,
+  skills: { select: { id: true, name: true } },
+  employments: {
+    select: {
+      id: true,
+      designation: true,
+      company: true,
+      location: true,
+      startMonth: true,
+      startYear: true,
+      endMonth: true,
+      endYear: true,
+      current: true,
+      description: true,
+    },
+  },
+  educations: {
+    select: { id: true, degree: true, specialization: true, institute: true, endYear: true, score: true },
+  },
+} satisfies Prisma.UserSelect;
 
 const contacts: Record<string, { hrName: string; hrPhone: string; hrEmail: string }> = {
   northline: { hrName: "Meera Kapoor", hrPhone: "+91 98450 22001", hrEmail: "meera@northline.in" },
@@ -38,7 +79,7 @@ async function main() {
   for (const application of applications) {
     await prisma.application.update({
       where: { id: application.id },
-      data: { resumeJson: JSON.stringify(buildResume(application.user)) },
+      data: { resumeJson: JSON.stringify(buildResume(application.user as SeekerProfile)) },
     });
   }
 

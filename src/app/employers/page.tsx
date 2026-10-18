@@ -7,8 +7,8 @@ export const metadata: Metadata = { title: "For employers" };
 
 const points = [
   {
-    title: "Live as soon as you publish",
-    body: "A listing needs a title, a location, what the work is, and who it is for. That is enough to go on the board.",
+    title: "Access comes from the main admin",
+    body: "A company account is a secondary admin. Jobs go on the board only after the main admin allows that company to post.",
   },
   {
     title: "Applications come with a note",
@@ -29,7 +29,7 @@ export default async function EmployersPage() {
       <p className="text-xs font-medium uppercase tracking-[0.18em] text-copper">For employers</p>
       <h1 className="mt-4 max-w-2xl text-5xl leading-[1.05] md:text-6xl">Hire without the noise.</h1>
       <p className="mt-5 max-w-xl text-lg text-muted">
-        JobAlert is a plain board for real roles. Post one, read the notes, and keep the people you want to talk to.
+        CareerRise is a plain board for real roles. Post one, read the notes, and keep the people you want to talk to.
       </p>
       <div className="mt-8 flex flex-wrap gap-3">
         {hiring ? (

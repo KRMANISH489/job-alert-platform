@@ -93,6 +93,7 @@ model Company {
   hrName    String   @default("")
   hrPhone   String   @default("")
   hrEmail   String   @default("")
+  approved  Boolean  @default(false)
   users     User[]
   jobs      Job[]
   createdAt DateTime @default(now())

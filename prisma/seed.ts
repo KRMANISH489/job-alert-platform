@@ -1,7 +1,48 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { hash } from "bcryptjs";
-import { seekerProfileSelect } from "../src/lib/profile";
+import type { SeekerProfile } from "../src/lib/profile";
 import { buildResume } from "../src/lib/resume";
+
+const seekerProfileSelect = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  headline: true,
+  resumeHeadline: true,
+  location: true,
+  bio: true,
+  experienceYears: true,
+  currentCompany: true,
+  currentCtc: true,
+  expectedCtc: true,
+  noticePeriod: true,
+  preferredLocations: true,
+  preferredType: true,
+  dateOfBirth: true,
+  gender: true,
+  languages: true,
+  industry: true,
+  department: true,
+  skills: { select: { id: true, name: true } },
+  employments: {
+    select: {
+      id: true,
+      designation: true,
+      company: true,
+      location: true,
+      startMonth: true,
+      startYear: true,
+      endMonth: true,
+      endYear: true,
+      current: true,
+      description: true,
+    },
+  },
+  educations: {
+    select: { id: true, degree: true, specialization: true, institute: true, endYear: true, score: true },
+  },
+} satisfies Prisma.UserSelect;
 
 const prisma = new PrismaClient();
 
@@ -402,13 +443,15 @@ async function main() {
   await prisma.company.deleteMany();
 
   const passwordHash = await hash("demo1234", 10);
-  const createdCompanies = await Promise.all(companies.map((company) => prisma.company.create({ data: company })));
+  const createdCompanies = await Promise.all(
+    companies.map((company) => prisma.company.create({ data: { ...company, approved: true } })),
+  );
   const companyId = Object.fromEntries(createdCompanies.map((company) => [company.slug, company.id]));
 
   await prisma.user.create({
     data: {
       email: "admin@jobalert.app",
-      name: "JobAlert Admin",
+      name: "CareerRise Admin",
       passwordHash,
       role: "admin",
     },
@@ -602,8 +645,8 @@ async function main() {
   const founding = await prisma.job.findUniqueOrThrow({ where: { slug: "founding-product-manager" } });
   const aishaProfile = await prisma.user.findUniqueOrThrow({ where: { id: aisha.id }, select: seekerProfileSelect });
   const rohanProfile = await prisma.user.findUniqueOrThrow({ where: { id: rohan.id }, select: seekerProfileSelect });
-  const aishaResume = JSON.stringify(buildResume(aishaProfile));
-  const rohanResume = JSON.stringify(buildResume(rohanProfile));
+  const aishaResume = JSON.stringify(buildResume(aishaProfile as SeekerProfile));
+  const rohanResume = JSON.stringify(buildResume(rohanProfile as SeekerProfile));
 
   await prisma.application.create({
     data: {
